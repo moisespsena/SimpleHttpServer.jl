@@ -44,7 +44,7 @@ server = HTTPServer(ws=true) do req::Request
 <!DOCTYPE HTML>
 <html>
    <head>
-	
+
       <script type="text/javascript">
          function WebSocketTest()
          {
@@ -52,21 +52,21 @@ server = HTTPServer(ws=true) do req::Request
             {
                // Let us open a web socket
                var ws = new WebSocket(location.href.replace("http", "ws"));
-				
+
                ws.onopen = function() {
                   // Web Socket is connected, send data using send()
                   ws.send("test message send from browser.");
                   alert("Message is sent...");
                };
-				
-               ws.onmessage = function (evt) { 
+
+               ws.onmessage = function (evt) {
                   var received_msg = evt.data;
                   alert("Message is received: [" + received_msg + "]");
                };
-				
-               ws.onclose = function() { 
+
+               ws.onclose = function() {
                   // websocket is closed.
-                  alert("Connection is closed..."); 
+                  alert("Connection is closed...");
                };
             } else {
                // The browser doesn't support WebSocket
@@ -74,17 +74,17 @@ server = HTTPServer(ws=true) do req::Request
             }
          }
       </script>
-		
+
    </head>
    <body>
-   
+
       <div id="sse">
          <a href="javascript:WebSocketTest()">Run WebSocket</a> |
          <a href="/chunk_function">Chunk Data from Function</a> |
          <a href="/chunk_task">Chunk Data from Task</a> |
          <a href="/chunk_iterable">Chunk Data from Iterable</a>
       </div>
-      
+
    </body>
 </html>
           """)
@@ -111,3 +111,15 @@ run(server, port=9100)
 run(server, host=IPv4(127,0,0,1), port=9100)
 ```
 If you open up `localhost:9100/` in your browser, you should get a greeting from the server.
+
+The File Download server:
+
+```
+server = HTTPServer() do req::Request
+    # FileResponse("data.txt")
+    # or
+    # streamer at 2 bytes in buffer
+    r = FileResponse("data.txt", true; buffer=2)
+    r
+end
+```
