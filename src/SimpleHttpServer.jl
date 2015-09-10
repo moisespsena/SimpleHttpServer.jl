@@ -15,9 +15,13 @@ using Nettle
 using Codecs
 using WebSockets
 using GnuTLS
+using Match
+using JSON
 import WebSockets: WebSocket, close
 import Base: listen, UVError, write
 import DataStructures:OrderedDict
+
+const C = SimpleHttpCommon
 
 export HTPHandler,
     Server,
@@ -32,7 +36,13 @@ export HTPHandler,
     Iterable,
     readbytes,
     readline,
-    readuntil
+    readuntil,
+    BytesReaderIterator,
+    BytesFileIterator,
+    LimitedBytesFileIterator,
+    FileResponse,
+    mh,
+    mh_push!
 
 hc_event = SimpleHttpCommon.event
 
@@ -194,7 +204,6 @@ websocket_handshake(req, res) = begin
   res.data = ""
 end
 
-
 function http_post_header(req::Request, res::Response)
     if !isempty(req.query)
         req.q = parse_qsr(req.query)
@@ -213,6 +222,14 @@ function http_post_header(req::Request, res::Response)
         else
             throw(HTTPParserHeaderException("Invalid Connection HEADER", "Upgrade: $(hupgrade)"))
         end
+    end
+
+    ct = get(req.headers, "Content-Type", "")
+
+    if search(ct, "application/x-www-form-urlencoded").start > 0
+        req.p = parse_qsr(C.bodys(req))
+    elseif search(ct, "application/json").start > 0
+        req.p = JSON.parse(C.bodys(req))
     end
 end
 
@@ -327,10 +344,8 @@ function write{T<:IO}(io::T, res::Response)
 
     it = nothing
 
-    if isa(res.data, Iterable)
+    if isa(res.data, Iterable) || isa(res.data, Task)
         it = res.data
-    elseif isa(res.data, Task)
-        it = Iterable(res.data)
     elseif isa(res.data, Function)
         it = Iterable(Task(res.data))
     end
@@ -343,6 +358,12 @@ function write{T<:IO}(io::T, res::Response)
 
     for (header, value) in res.headers
         write(io, @sprintf "%s: %s\r\n" header value)
+    end
+
+    for (header, value_list) in res.mheaders
+        for value in value_list
+            write(io, @sprintf "%s: %s\r\n" header value)
+        end
     end
 
     write(io, "\r\n")
@@ -368,7 +389,6 @@ function write{T<:IO}(io::T, res::Response)
         write(io, "\r\n")
     end
 end
-
 
 function listen(server::Server, host::Base.IpAddr, port::Integer)
     server.handler.sock = listen(host, port)
